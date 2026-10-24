@@ -1,0 +1,125 @@
+# File: silver_to_gold_mapping.yaml
+version: 1.0
+architecture: medallion_gold
+domain: insurance_core
+orchestration: dynamic_tables
+
+models:
+  - target_table: GOLD.DIM_CUSTOMER_360
+    ontology_reference: ACORD.PartyProfile
+    materialization:
+      type: dynamic_table
+      target_lag: "1 hour"
+      warehouse: "COMPUTE_WH"
+    sources:
+      - source_id: SILVER_PARTY
+        location: SILVER.DIM_PARTY
+      - source_id: SILVER_LOCATION
+        location: SILVER.DIM_LOCATION
+        join_type: LEFT
+        condition: "SILVER_PARTY.SOURCE_RECORD_ID = SILVER_LOCATION.SOURCE_RECORD_ID AND SILVER_PARTY.SOURCE_SYSTEM = SILVER_LOCATION.SOURCE_SYSTEM"
+      - source_id: SILVER_COMM
+        location: SILVER.DIM_COMMUNICATION
+        join_type: LEFT
+        condition: "SILVER_PARTY.PARTY_SK = SILVER_COMM.PARTY_SK AND SILVER_COMM.PRIMARY_IND = TRUE"
+      - source_id: SILVER_TX
+        location: SILVER.FACT_FINANCIAL_TX
+        join_type: LEFT
+        condition: "SILVER_PARTY.PARTY_SK = SILVER_TX.PAYING_PARTY_SK AND SILVER_TX.TRANSACTION_STATUS_CD = 'Settled'"
+    filters:
+      - "SILVER_PARTY.PARTY_TYPE_CD = 'Insured'"
+    group_by: 
+      - "SILVER_PARTY.PARTY_SK"
+      - "SILVER_PARTY.FIRST_NAME"
+      - "SILVER_PARTY.LAST_NAME"
+      - "SILVER_PARTY.CLIENT_CATEGORY_CD"
+      - "SILVER_PARTY.BIRTH_DT"
+      - "SILVER_LOCATION.TERRITORY_NAME"
+      - "SILVER_COMM.COMMUNICATION_TYPE_CD"
+      - "SILVER_COMM.COMMUNICATION_VALUE_TXT"
+    transformations:
+      - target_column: CUSTOMER_SK
+        logic: "SILVER_PARTY.PARTY_SK"
+      - target_column: FULL_NAME
+        logic: "COALESCE(SILVER_PARTY.FIRST_NAME || ' ' || SILVER_PARTY.LAST_NAME, 'UNKNOWN')"
+      - target_column: CLIENT_CATEGORY_CD
+        logic: "SILVER_PARTY.CLIENT_CATEGORY_CD"
+      - target_column: AGE
+        logic: "TRUNC(DATEDIFF(YEAR, SILVER_PARTY.BIRTH_DT, CURRENT_DATE()))"
+      - target_column: PRIMARY_TERRITORY
+        logic: "SILVER_LOCATION.TERRITORY_NAME"
+      - target_column: PRIMARY_CONTACT_METHOD
+        logic: "SILVER_COMM.COMMUNICATION_TYPE_CD"
+      - target_column: PRIMARY_CONTACT_VALUE
+        logic: "SILVER_COMM.COMMUNICATION_VALUE_TXT"
+      - target_column: CUSTOMER_LIFETIME_VALUE
+        logic: "COALESCE(SUM(SILVER_TX.TRANSACTION_AMT), 0)"
+
+  - target_table: GOLD.FACT_POLICY_PREMIUM_METRICS
+    ontology_reference: ACORD.AgreementPerformanceSnapshot
+    materialization:
+      type: dynamic_table
+      target_lag: "1 day"
+      warehouse: "COMPUTE_WH"
+    sources:
+      - source_id: SILVER_AGREEMENT
+        location: SILVER.FACT_AGREEMENT
+      - source_id: SILVER_PRODUCT
+        location: SILVER.DIM_INSURANCE_PRODUCT
+        join_type: INNER
+        condition: "SILVER_AGREEMENT.PRODUCT_SK = SILVER_PRODUCT.PRODUCT_SK"
+    filters:
+      - "SILVER_AGREEMENT.AGREEMENT_STATUS_CD = 'Active'"
+      - "SILVER_AGREEMENT.EFFECTIVE_DT <= CURRENT_DATE()"
+      - "SILVER_AGREEMENT.EXPIRATION_DT >= CURRENT_DATE()"
+    group_by:
+      - "SILVER_PRODUCT.LOB_CD"
+      - "SILVER_PRODUCT.PRODUCT_NAME"
+    transformations:
+      - target_column: SNAPSHOT_DATE
+        logic: "CURRENT_DATE()"
+      - target_column: LOB_CD
+        logic: "SILVER_PRODUCT.LOB_CD"
+      - target_column: PRODUCT_NAME
+        logic: "SILVER_PRODUCT.PRODUCT_NAME"
+      - target_column: ACTIVE_POLICY_COUNT
+        logic: "COUNT(DISTINCT SILVER_AGREEMENT.AGREEMENT_SK)"
+      - target_column: GROSS_WRITTEN_PREMIUM
+        logic: "SUM(SILVER_AGREEMENT.CURRENT_TERM_AMT)"
+      - target_column: NEW_POLICIES_WRITTEN
+        logic: "COUNT(DISTINCT CASE WHEN SILVER_AGREEMENT.EFFECTIVE_DT = CURRENT_DATE() THEN SILVER_AGREEMENT.AGREEMENT_SK ELSE NULL END)"
+
+  - target_table: GOLD.FACT_LOSS_PERFORMANCE
+    ontology_reference: ACORD.LossPerformance
+    materialization:
+      type: dynamic_table
+      target_lag: "1 hour"
+      warehouse: "COMPUTE_WH"
+    sources:
+      - source_id: SILVER_LOSS
+        location: SILVER.FACT_LOSS_EVENT
+      - source_id: SILVER_AGREEMENT
+        location: SILVER.FACT_AGREEMENT
+        join_type: INNER
+        condition: "SILVER_LOSS.AGREEMENT_SK = SILVER_AGREEMENT.AGREEMENT_SK"
+      - source_id: SILVER_PRODUCT
+        location: SILVER.DIM_INSURANCE_PRODUCT
+        join_type: INNER
+        condition: "SILVER_AGREEMENT.PRODUCT_SK = SILVER_PRODUCT.PRODUCT_SK"
+    transformations:
+      - target_column: LOSS_EVENT_SK
+        logic: "SILVER_LOSS.LOSS_EVENT_SK"
+      - target_column: LOB_CD
+        logic: "SILVER_PRODUCT.LOB_CD"
+      - target_column: LOSS_TYPE_CD
+        logic: "SILVER_LOSS.LOSS_TYPE_CD"
+      - target_column: CLAIM_STATUS_CD
+        logic: "SILVER_LOSS.CLAIM_STATUS_CD"
+      - target_column: DAYS_TO_REPORT
+        logic: "DATEDIFF(DAY, SILVER_LOSS.LOSS_DT, SILVER_LOSS.REPORTED_DT)"
+      - target_column: DAYS_TO_SETTLE
+        logic: "DATEDIFF(DAY, SILVER_LOSS.REPORTED_DT, SILVER_LOSS.SETTLEMENT_DT)"
+      - target_column: SETTLED_AMOUNT
+        logic: "SILVER_LOSS.PAID_TOTAL_AMT"
+      - target_column: CLAIM_SEVERITY_RATIO
+        logic: "CASE WHEN SILVER_AGREEMENT.CURRENT_TERM_AMT > 0 THEN (SILVER_LOSS.PAID_TOTAL_AMT / SILVER_AGREEMENT.CURRENT_TERM_AMT) ELSE 0 END"

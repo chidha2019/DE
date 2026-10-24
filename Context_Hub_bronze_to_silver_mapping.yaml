@@ -1,0 +1,375 @@
+# File: bronze_to_silver_mapping.yaml
+version: 1.0
+architecture: medallion_silver
+domain: insurance_core
+orchestration: stream_and_task
+
+models:
+  - target_table: SILVER.DIM_PARTY
+    ontology_reference: ACORD.Party
+    sources:
+      - source_id: SYS_A_CUSTOMER
+        type: iceberg_table
+        location: BRONZE.SYSTEM_A.CUSTOMER
+      - source_id: SYS_A_STAFF
+        type: iceberg_table
+        location: BRONZE.SYSTEM_A.STAFF
+      - source_id: SYS_B_CLIENT
+        type: external_stage_csv
+        location: BRONZE.SYSTEM_B.CLIENT
+      - source_id: SYS_B_EMPLOYEE
+        type: external_stage_csv
+        location: BRONZE.SYSTEM_B.EMPLOYEE
+    transformations:
+      - target_column: PARTY_SK
+        logic: "HASH(SOURCE_SYSTEM, SOURCE_RECORD_ID)"
+      - target_column: SOURCE_SYSTEM
+        logic: 
+          SYS_A_CUSTOMER: "'SYSTEM_A_ICEBERG'"
+          SYS_A_STAFF: "'SYSTEM_A_ICEBERG'"
+          SYS_B_CLIENT: "'SYSTEM_B_CSV'"
+          SYS_B_EMPLOYEE: "'SYSTEM_B_CSV'"
+      - target_column: SOURCE_RECORD_ID
+        logic:
+          SYS_A_CUSTOMER: "CAST(Cust_Id AS VARCHAR)"
+          SYS_A_STAFF: "CAST(Staff_Id AS VARCHAR)"
+          SYS_B_CLIENT: "CAST(client_id AS VARCHAR)"
+          SYS_B_EMPLOYEE: "CAST(employee_id AS VARCHAR)"
+      - target_column: PARTY_TYPE_CD
+        logic:
+          SYS_A_CUSTOMER: "'Insured'"
+          SYS_A_STAFF: "'Employee'"
+          SYS_B_CLIENT: "'Insured'"
+          SYS_B_EMPLOYEE: "'Employee'"
+      - target_column: FIRST_NAME
+        logic:
+          SYS_A_CUSTOMER: "TRIM(Cust_FName)"
+          SYS_A_STAFF: "TRIM(Staff_Fname)"
+          SYS_B_CLIENT: "TRIM(first_name)"
+          SYS_B_EMPLOYEE: "TRIM(first_name)"
+      - target_column: LAST_NAME
+        logic:
+          SYS_A_CUSTOMER: "TRIM(Cust_LName)"
+          SYS_A_STAFF: "TRIM(Staff_LName)"
+          SYS_B_CLIENT: "TRIM(last_name)"
+          SYS_B_EMPLOYEE: "TRIM(last_name)"
+      - target_column: BIRTH_DT
+        logic:
+          SYS_A_CUSTOMER: "CAST(Cust_DOB AS DATE)"
+          SYS_A_STAFF: "NULL" # Staff table lacks DOB
+          SYS_B_CLIENT: "TRY_TO_DATE(date_of_birth, 'YYYY-MM-DD')"
+          SYS_B_EMPLOYEE: "TRY_TO_DATE(date_of_birth, 'YYYY-MM-DD')"
+      - target_column: GENDER_CD
+        logic:
+          SYS_A_CUSTOMER: "UPPER(Cust_Gender)"
+          SYS_A_STAFF: "UPPER(Staff_Gender)"
+          default: "NULL"
+      - target_column: MARITAL_STATUS_CD
+        logic:
+          SYS_A_CUSTOMER: "TRIM(Cust_Marital_Status)"
+          SYS_A_STAFF: "TRIM(Staff_Marital_Status)"
+          default: "NULL"
+      - target_column: EMPLOYMENT_START_DT
+        logic:
+          SYS_B_EMPLOYEE: "TRY_TO_DATE(date_of_employment, 'YYYY-MM-DD')"
+          default: "NULL"
+      - target_column: BASE_COMPENSATION_AMT
+        logic:
+          SYS_A_STAFF: "CAST(Staff_Allowance AS NUMBER(18,2))"
+          SYS_B_EMPLOYEE: "CAST(salary AS NUMBER(18,2))"
+          default: "NULL"
+      - target_column: CLIENT_CATEGORY_CD
+        logic:
+          SYS_A_CUSTOMER: "'Standard'"
+          SYS_B_CLIENT: "LOOKUP(clientType_id) FROM BRONZE.SYSTEM_B.CLIENTTYPE RETURNING clientType_name"
+          default: "NULL"
+      - target_column: DISCOUNT_PCT
+        logic:
+          SYS_B_CLIENT: "CAST(discount AS NUMBER(5,2))"
+          default: "0.00"
+      - target_column: RECORD_HASH
+        logic: "HASH(FIRST_NAME, LAST_NAME, BIRTH_DT, GENDER_CD, MARITAL_STATUS_CD, EMPLOYMENT_START_DT, BASE_COMPENSATION_AMT, CLIENT_CATEGORY_CD, DISCOUNT_PCT)"
+
+  - target_table: SILVER.DIM_LOCATION
+    ontology_reference: ACORD.Location
+    sources:
+      - source_id: SYS_A_CUSTOMER
+        type: iceberg_table
+        location: BRONZE.SYSTEM_A.CUSTOMER
+      - source_id: SYS_B_CLIENT
+        type: external_stage_csv
+        location: BRONZE.SYSTEM_B.CLIENT
+    transformations:
+      - target_column: LOCATION_SK
+        logic: "HASH(SOURCE_SYSTEM, SOURCE_RECORD_ID)"
+      - target_column: SOURCE_SYSTEM
+        logic:
+          SYS_A_CUSTOMER: "'SYSTEM_A_ICEBERG'"
+          SYS_B_CLIENT: "'SYSTEM_B_CSV'"
+      - target_column: SOURCE_RECORD_ID
+        logic:
+          SYS_A_CUSTOMER: "CAST(Cust_Id AS VARCHAR)"
+          SYS_B_CLIENT: "CAST(client_id AS VARCHAR)"
+      - target_column: TERRITORY_NAME
+        logic:
+          SYS_A_CUSTOMER: "NULL"
+          SYS_B_CLIENT: "LOOKUP(region_id) FROM BRONZE.SYSTEM_B.REGION RETURNING region_name"
+      - target_column: CITY_NAME
+        logic:
+          SYS_A_CUSTOMER: "NULL"
+          SYS_B_CLIENT: "LOOKUP(city_id) FROM BRONZE.SYSTEM_B.CITY RETURNING city_name" # Assumes implicit city.csv based on schema pattern
+      - target_column: STREET_NAME
+        logic:
+          SYS_A_CUSTOMER: "NULL"
+          SYS_B_CLIENT: "LOOKUP(street_id) FROM BRONZE.SYSTEM_B.STREET RETURNING street_name" # Assumes implicit street.csv
+      - target_column: HOUSE_NUMBER
+        logic:
+          SYS_A_CUSTOMER: "NULL"
+          SYS_B_CLIENT: "LOOKUP(houseNr_id) FROM BRONZE.SYSTEM_B.HOUSENR RETURNING houseNr_nr"
+      - target_column: FORMATTED_ADDRESS_TXT
+        logic:
+          SYS_A_CUSTOMER: "TRIM(Cust_Address)"
+          SYS_B_CLIENT: "CONCAT_WS(', ', HOUSE_NUMBER, STREET_NAME, CITY_NAME, TERRITORY_NAME)"
+      - target_column: RECORD_HASH
+        logic: "HASH(TERRITORY_NAME, CITY_NAME, STREET_NAME, HOUSE_NUMBER, FORMATTED_ADDRESS_TXT)"
+
+  - target_table: SILVER.DIM_COMMUNICATION
+    ontology_reference: ACORD.Communication
+    sources:
+      - source_id: SYS_A_CUSTOMER_MOB
+        type: iceberg_table
+        location: BRONZE.SYSTEM_A.CUSTOMER
+      - source_id: SYS_A_CUSTOMER_EMAIL
+        type: iceberg_table
+        location: BRONZE.SYSTEM_A.CUSTOMER
+      - source_id: SYS_B_PHONE
+        type: external_stage_csv
+        location: BRONZE.SYSTEM_B.PHONE
+    transformations:
+      - target_column: COMMUNICATION_SK
+        logic:
+          SYS_A_CUSTOMER_MOB: "HASH('SYSTEM_A_ICEBERG', Cust_Id, 'MOBILE')"
+          SYS_A_CUSTOMER_EMAIL: "HASH('SYSTEM_A_ICEBERG', Cust_Id, 'EMAIL')"
+          SYS_B_PHONE: "HASH('SYSTEM_B_CSV', phone_id)"
+      - target_column: PARTY_SK
+        logic:
+          SYS_A_CUSTOMER_MOB: "HASH('SYSTEM_A_ICEBERG', Cust_Id)"
+          SYS_A_CUSTOMER_EMAIL: "HASH('SYSTEM_A_ICEBERG', Cust_Id)"
+          SYS_B_PHONE: "HASH('SYSTEM_B_CSV', COALESCE(client_id, employee_id))"
+      - target_column: SOURCE_SYSTEM
+        logic:
+          SYS_A_CUSTOMER_MOB: "'SYSTEM_A_ICEBERG'"
+          SYS_A_CUSTOMER_EMAIL: "'SYSTEM_A_ICEBERG'"
+          SYS_B_PHONE: "'SYSTEM_B_CSV'"
+      - target_column: COMMUNICATION_USE_CD
+        logic: "'Personal'"
+      - target_column: COMMUNICATION_TYPE_CD
+        logic:
+          SYS_A_CUSTOMER_MOB: "'Mobile'"
+          SYS_A_CUSTOMER_EMAIL: "'Email'"
+          SYS_B_PHONE: "CASE WHEN LOOKUP(phoneType_id) FROM BRONZE.SYSTEM_B.PHONETYPE RETURNING type_name = 'komórkowy' THEN 'Mobile' ELSE 'Landline' END"
+      - target_column: COMMUNICATION_VALUE_TXT
+        logic:
+          SYS_A_CUSTOMER_MOB: "CAST(Cust_MOB_Number AS VARCHAR)"
+          SYS_A_CUSTOMER_EMAIL: "TRIM(Cust_Email)"
+          SYS_B_PHONE: "TRIM(phone_number)"
+        filter: "COMMUNICATION_VALUE_TXT IS NOT NULL"
+      - target_column: PRIMARY_IND
+        logic: "TRUE"
+      - target_column: RECORD_HASH
+        logic: "HASH(COMMUNICATION_USE_CD, COMMUNICATION_TYPE_CD, COMMUNICATION_VALUE_TXT, PRIMARY_IND)"
+
+  - target_table: SILVER.DIM_INSURANCE_PRODUCT
+    ontology_reference: ACORD.CoverageAvailable
+    sources:
+      - source_id: SYS_A_PRODUCT
+        type: iceberg_table
+        location: BRONZE.SYSTEM_A.PRODUCT
+        join:
+          table: BRONZE.SYSTEM_A.COVERAGE
+          condition: "PRODUCT.Product_Number = COVERAGE.Product_Id"
+      - source_id: SYS_B_INSURANCE
+        type: external_stage_csv
+        location: BRONZE.SYSTEM_B.INSURANCE
+    transformations:
+      - target_column: PRODUCT_SK
+        logic:
+          SYS_A_PRODUCT: "HASH('SYSTEM_A_ICEBERG', Product_Number, Coverage_Id)"
+          SYS_B_INSURANCE: "HASH('SYSTEM_B_CSV', insuranceType_id)"
+      - target_column: SOURCE_SYSTEM
+        logic:
+          SYS_A_PRODUCT: "'SYSTEM_A_ICEBERG'"
+          SYS_B_INSURANCE: "'SYSTEM_B_CSV'"
+      - target_column: SOURCE_RECORD_ID
+        logic:
+          SYS_A_PRODUCT: "CONCAT(Product_Number, '|', Coverage_Id)"
+          SYS_B_INSURANCE: "CAST(insuranceType_id AS VARCHAR)"
+      - target_column: LOB_CD
+        logic:
+          SYS_A_PRODUCT: "TRIM(Coverage_Type)"
+          SYS_B_INSURANCE: "LOOKUP(insuranceType_id) FROM BRONZE.SYSTEM_B.INSURANCETYPE RETURNING insurance_type"
+      - target_column: PRODUCT_CD
+        logic:
+          SYS_A_PRODUCT: "TRIM(Product_Number)"
+          SYS_B_INSURANCE: "CAST(insuranceType_id AS VARCHAR)"
+      - target_column: PRODUCT_NAME
+        logic:
+          SYS_A_PRODUCT: "TRIM(Product_Type)"
+          SYS_B_INSURANCE: "LOOKUP(insuranceType_id) FROM BRONZE.SYSTEM_B.INSURANCETYPE RETURNING insurance_type"
+      - target_column: COVERAGE_LEVEL_CD
+        logic:
+          SYS_A_PRODUCT: "TRIM(Coverage_Level)"
+          SYS_B_INSURANCE: "'Standard'"
+      - target_column: BASE_PREMIUM_AMT
+        logic:
+          SYS_A_PRODUCT: "CAST(Product_Price AS NUMBER(18,2))"
+          SYS_B_INSURANCE: "CAST(price AS NUMBER(18,2))"
+      - target_column: TERMS_DESC
+        logic:
+          SYS_A_PRODUCT: "TRIM(Coverage_Description)"
+          SYS_B_INSURANCE: "NULL"
+      - target_column: RECORD_HASH
+        logic: "HASH(LOB_CD, PRODUCT_CD, PRODUCT_NAME, COVERAGE_LEVEL_CD, BASE_PREMIUM_AMT, TERMS_DESC)"
+
+  - target_table: SILVER.FACT_AGREEMENT
+    ontology_reference: ACORD.Agreement
+    sources:
+      - source_id: SYS_A_POLICY
+        type: iceberg_table
+        location: BRONZE.SYSTEM_A.INSURANCE_POLICY
+      - source_id: SYS_B_INSURANCE
+        type: external_stage_csv
+        location: BRONZE.SYSTEM_B.INSURANCE
+    transformations:
+      - target_column: AGREEMENT_SK
+        logic: 
+          SYS_A_POLICY: "HASH('SYSTEM_A_ICEBERG', Agreement_id)"
+          SYS_B_INSURANCE: "HASH('SYSTEM_B_CSV', insurance_id)"
+      - target_column: INSURED_PARTY_SK
+        logic:
+          SYS_A_POLICY: "HASH('SYSTEM_A_ICEBERG', Cust_Id)"
+          SYS_B_INSURANCE: "HASH('SYSTEM_B_CSV', client_id)"
+      - target_column: PRODUCER_PARTY_SK
+        logic:
+          SYS_A_POLICY: "NULL"
+          SYS_B_INSURANCE: "HASH('SYSTEM_B_CSV', employee_id)"
+      - target_column: PRODUCT_SK
+        logic:
+          SYS_A_POLICY: "LOOKUP(Agreement_id) FROM BRONZE.SYSTEM_A.INSURANCE_POLICY_COVERAGE RETURNING HASH('SYSTEM_A_ICEBERG', Product_Number, Coverage_Id)"
+          SYS_B_INSURANCE: "HASH('SYSTEM_B_CSV', insuranceType_id)"
+      - target_column: SOURCE_SYSTEM
+        logic:
+          SYS_A_POLICY: "'SYSTEM_A_ICEBERG'"
+          SYS_B_INSURANCE: "'SYSTEM_B_CSV'"
+      - target_column: AGREEMENT_NUM
+        logic:
+          SYS_A_POLICY: "TRIM(Policy_Number)"
+          SYS_B_INSURANCE: "TRIM(insurance_number)"
+      - target_column: AGREEMENT_STATUS_CD
+        logic:
+          SYS_A_POLICY: "CASE WHEN CURRENT_DATE() BETWEEN Start_Date AND Expiry_Date THEN 'Active' ELSE 'Expired' END"
+          SYS_B_INSURANCE: "CASE WHEN CURRENT_DATE() BETWEEN TRY_TO_DATE(begin_date) AND TRY_TO_DATE(expiration_date) THEN 'Active' ELSE 'Expired' END"
+      - target_column: EFFECTIVE_DT
+        logic:
+          SYS_A_POLICY: "CAST(Start_Date AS DATE)"
+          SYS_B_INSURANCE: "TRY_TO_DATE(begin_date, 'YYYY-MM-DD')"
+      - target_column: EXPIRATION_DT
+        logic:
+          SYS_A_POLICY: "CAST(Expiry_Date AS DATE)"
+          SYS_B_INSURANCE: "TRY_TO_DATE(expiration_date, 'YYYY-MM-DD')"
+      - target_column: CURRENT_TERM_AMT
+        logic:
+          SYS_A_POLICY: "LOOKUP(Policy_Number) FROM BRONZE.SYSTEM_A.PREMIUM_PAYMENT RETURNING SUM(Premium_Payment_Amount)"
+          SYS_B_INSURANCE: "CAST(price AS NUMBER(18,2))"
+      - target_column: RECORD_HASH
+        logic: "HASH(INSURED_PARTY_SK, PRODUCER_PARTY_SK, PRODUCT_SK, AGREEMENT_NUM, AGREEMENT_STATUS_CD, EFFECTIVE_DT, EXPIRATION_DT, CURRENT_TERM_AMT)"
+
+  - target_table: SILVER.FACT_FINANCIAL_TX
+    ontology_reference: ACORD.FinancialTransaction
+    sources:
+      - source_id: SYS_A_RECEIPT
+        type: iceberg_table
+        location: BRONZE.SYSTEM_A.RECEIPT
+        join:
+          table: BRONZE.SYSTEM_A.PREMIUM_PAYMENT
+          condition: "RECEIPT.Premium_Payment_Id = PREMIUM_PAYMENT.Premium_Payment_Id"
+      - source_id: SYS_B_PAYMENT
+        type: external_stage_csv
+        location: BRONZE.SYSTEM_B.PAYMENT
+    transformations:
+      - target_column: TRANSACTION_SK
+        logic:
+          SYS_A_RECEIPT: "HASH('SYSTEM_A_ICEBERG', Receipt_Id)"
+          SYS_B_PAYMENT: "HASH('SYSTEM_B_CSV', payment_id)"
+      - target_column: AGREEMENT_SK
+        logic:
+          SYS_A_RECEIPT: "LOOKUP(Policy_Number) FROM BRONZE.SYSTEM_A.INSURANCE_POLICY RETURNING HASH('SYSTEM_A_ICEBERG', Agreement_id)"
+          SYS_B_PAYMENT: "LOOKUP(payment_id) FROM BRONZE.SYSTEM_B.INSURANCE RETURNING HASH('SYSTEM_B_CSV', insurance_id)"
+      - target_column: PAYING_PARTY_SK
+        logic:
+          SYS_A_RECEIPT: "HASH('SYSTEM_A_ICEBERG', Cust_Id)"
+          SYS_B_PAYMENT: "LOOKUP(payment_id) FROM BRONZE.SYSTEM_B.INSURANCE RETURNING HASH('SYSTEM_B_CSV', client_id)"
+      - target_column: SOURCE_SYSTEM
+        logic:
+          SYS_A_RECEIPT: "'SYSTEM_A_ICEBERG'"
+          SYS_B_PAYMENT: "'SYSTEM_B_CSV'"
+      - target_column: SOURCE_RECORD_ID
+        logic:
+          SYS_A_RECEIPT: "CAST(Receipt_Id AS VARCHAR)"
+          SYS_B_PAYMENT: "CAST(payment_id AS VARCHAR)"
+      - target_column: TRANSACTION_DT
+        logic:
+          SYS_A_RECEIPT: "CAST(Time AS DATE)"
+          SYS_B_PAYMENT: "TRY_TO_DATE(payment_date, 'YYYY-MM-DD')"
+      - target_column: TRANSACTION_AMT
+        logic:
+          SYS_A_RECEIPT: "CAST(Cost AS NUMBER(18,2))"
+          SYS_B_PAYMENT: "CAST(payment_amount AS NUMBER(18,2))"
+      - target_column: PAYMENT_METHOD_CD
+        logic:
+          SYS_A_RECEIPT: "'Unknown'"
+          SYS_B_PAYMENT: "TRIM(payment_type)"
+      - target_column: TRANSACTION_STATUS_CD
+        logic: "'Settled'"
+      - target_column: RECORD_HASH
+        logic: "HASH(AGREEMENT_SK, PAYING_PARTY_SK, TRANSACTION_DT, TRANSACTION_AMT, PAYMENT_METHOD_CD, TRANSACTION_STATUS_CD)"
+
+  - target_table: SILVER.FACT_LOSS_EVENT
+    ontology_reference: ACORD.LossEvent
+    sources:
+      - source_id: SYS_A_CLAIM
+        type: iceberg_table
+        location: BRONZE.SYSTEM_A.CLAIM
+        join:
+          table: BRONZE.SYSTEM_A.INCIDENT
+          condition: "CLAIM.Incident_Id = INCIDENT.Incident_Id"
+        left_join:
+          table: BRONZE.SYSTEM_A.CLAIM_SETTLEMENT
+          condition: "CLAIM.Claim_Id = CLAIM_SETTLEMENT.Claim_Id"
+    transformations:
+      - target_column: LOSS_EVENT_SK
+        logic: "HASH('SYSTEM_A_ICEBERG', CLAIM.Claim_Id)"
+      - target_column: AGREEMENT_SK
+        logic: "HASH('SYSTEM_A_ICEBERG', CLAIM.Agreement_Id)"
+      - target_column: CLAIMANT_PARTY_SK
+        logic: "HASH('SYSTEM_A_ICEBERG', CLAIM.Cust_Id)"
+      - target_column: SOURCE_SYSTEM
+        logic: "'SYSTEM_A_ICEBERG'"
+      - target_column: SOURCE_CLAIM_ID
+        logic: "CAST(CLAIM.Claim_Id AS VARCHAR)"
+      - target_column: LOSS_DT
+        logic: "CAST(INCIDENT.Incident_Date AS DATE)"
+      - target_column: REPORTED_DT
+        logic: "CAST(CLAIM.Date_Of_Claim AS DATE)"
+      - target_column: LOSS_TYPE_CD
+        logic: "TRIM(CLAIM.Damage_Type)"
+      - target_column: CLAIM_STATUS_CD
+        logic: "TRIM(CLAIM.Claim_Status)"
+      - target_column: INCURRED_AMT
+        logic: "CAST(CLAIM.Claim_Amount AS NUMBER(18,2))"
+      - target_column: PAID_TOTAL_AMT
+        logic: "CAST(CLAIM_SETTLEMENT.Amount_Paid AS NUMBER(18,2))"
+      - target_column: SETTLEMENT_DT
+        logic: "CAST(CLAIM_SETTLEMENT.Date_Settled AS DATE)"
+      - target_column: RECORD_HASH
+        logic: "HASH(AGREEMENT_SK, CLAIMANT_PARTY_SK, LOSS_DT, REPORTED_DT, LOSS_TYPE_CD, CLAIM_STATUS_CD, INCURRED_AMT, PAID_TOTAL_AMT, SETTLEMENT_DT)"

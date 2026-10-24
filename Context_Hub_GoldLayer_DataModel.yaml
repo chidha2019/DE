@@ -1,0 +1,377 @@
+version: 1.0
+architecture: medallion_silver
+domain: insurance_core
+standards_alignment:
+  primary_ontology: ACORD_Information_Model
+  secondary_ontology: OSI_Semantic_Framework
+description: "Conformed Silver layer data model mapping heterogeneous source systems (Iceberg, CSV) into standardized insurance enterprise entities."
+
+models:
+  - name: SILVER.DIM_PARTY
+    type: dimension
+    primary_key: PARTY_SK
+    description: "Represents any person or organization interacting with the insurer, encompassing customers, employees, and applicants."
+    acord_concept: Party
+    columns:
+      - name: PARTY_SK
+        type: VARCHAR(64)
+        description: "Deterministic surrogate key generated via HASH(SOURCE_SYSTEM, SOURCE_RECORD_ID)."
+        semantic_mapping: "Infrastructure.Key.Surrogate"
+      - name: SOURCE_SYSTEM
+        type: VARCHAR(50)
+        description: "Originating system of record (e.g., SYSTEM_A_ICEBERG, SYSTEM_B_CSV)."
+        semantic_mapping: "Infrastructure.Audit.SourceSystem"
+      - name: SOURCE_RECORD_ID
+        type: VARCHAR(50)
+        description: "The original primary key from the source system."
+        semantic_mapping: "Infrastructure.Key.Natural"
+      - name: PARTY_TYPE_CD
+        type: VARCHAR(20)
+        description: "Categorization of the party role (e.g., Insured, Applicant, Employee, Producer)."
+        semantic_mapping: "Party.PartyRole.RoleTypeCd"
+      - name: FIRST_NAME
+        type: VARCHAR(100)
+        description: "Legal first name of the individual party."
+        semantic_mapping: "Party.Person.GivenName"
+      - name: LAST_NAME
+        type: VARCHAR(100)
+        description: "Legal last name of the individual party."
+        semantic_mapping: "Party.Person.Surname"
+      - name: BIRTH_DT
+        type: DATE
+        description: "Date of birth for individual parties."
+        semantic_mapping: "Party.Person.BirthDt"
+      - name: GENDER_CD
+        type: CHAR(2)
+        description: "Standardized gender code (e.g., M, F, U)."
+        semantic_mapping: "Party.Person.GenderCd"
+      - name: MARITAL_STATUS_CD
+        type: VARCHAR(20)
+        description: "Standardized marital status (e.g., Single, Married)."
+        semantic_mapping: "Party.Person.MaritalStatusCd"
+      - name: EMPLOYMENT_START_DT
+        type: DATE
+        description: "Date of hire for internal employees/producers; NULL for customers."
+        semantic_mapping: "Party.Employment.HireDt"
+      - name: BASE_COMPENSATION_AMT
+        type: NUMBER(18,2)
+        description: "Base salary or allowance amount for employees/producers; NULL for customers."
+        semantic_mapping: "Party.Employment.CompensationAmt"
+      - name: CLIENT_CATEGORY_CD
+        type: VARCHAR(50)
+        description: "Retail or commercial classification."
+        semantic_mapping: "Party.CustomerProfile.CategoryCd"
+      - name: DISCOUNT_PCT
+        type: NUMBER(5,2)
+        description: "Applicable enterprise discount percentage granted to the party."
+        semantic_mapping: "Party.CustomerProfile.DiscountPct"
+      - name: RECORD_HASH
+        type: VARCHAR(64)
+        description: "Hash of all non-metadata columns to detect CDC updates."
+        semantic_mapping: "Infrastructure.Audit.RecordHash"
+
+  - name: SILVER.DIM_LOCATION
+    type: dimension
+    primary_key: LOCATION_SK
+    description: "Standardized postal addresses and geographic territories across the enterprise."
+    acord_concept: Location
+    columns:
+      - name: LOCATION_SK
+        type: VARCHAR(64)
+        description: "Deterministic surrogate key for the location."
+        semantic_mapping: "Infrastructure.Key.Surrogate"
+      - name: SOURCE_SYSTEM
+        type: VARCHAR(50)
+        description: "Originating system of record."
+        semantic_mapping: "Infrastructure.Audit.SourceSystem"
+      - name: SOURCE_RECORD_ID
+        type: VARCHAR(50)
+        description: "The original composite or primary key for the location."
+        semantic_mapping: "Infrastructure.Key.Natural"
+      - name: TERRITORY_NAME
+        type: VARCHAR(100)
+        description: "Standardized region, state, or province."
+        semantic_mapping: "Location.Addr.StateProvCd"
+      - name: CITY_NAME
+        type: VARCHAR(100)
+        description: "Name of the city or municipality."
+        semantic_mapping: "Location.Addr.City"
+      - name: STREET_NAME
+        type: VARCHAR(150)
+        description: "Name of the street or thoroughfare."
+        semantic_mapping: "Location.Addr.StreetName"
+      - name: HOUSE_NUMBER
+        type: VARCHAR(20)
+        description: "Specific house, building, or apartment number."
+        semantic_mapping: "Location.Addr.StreetNumber"
+      - name: FORMATTED_ADDRESS_TXT
+        type: VARCHAR(255)
+        description: "Fully concatenated address string for systems lacking normalized geographic hierarchies."
+        semantic_mapping: "Location.Addr.Line1Txt"
+      - name: RECORD_HASH
+        type: VARCHAR(64)
+        description: "Hash of location attributes for CDC."
+        semantic_mapping: "Infrastructure.Audit.RecordHash"
+
+  - name: SILVER.DIM_COMMUNICATION
+    type: dimension
+    primary_key: COMMUNICATION_SK
+    description: "Standardizes all methods of contact (phone, email, fax) linked to a specific Party."
+    acord_concept: Communication
+    foreign_keys:
+      - column: PARTY_SK
+        references: SILVER.DIM_PARTY.PARTY_SK
+    columns:
+      - name: COMMUNICATION_SK
+        type: VARCHAR(64)
+        description: "Deterministic surrogate key for the contact method."
+        semantic_mapping: "Infrastructure.Key.Surrogate"
+      - name: PARTY_SK
+        type: VARCHAR(64)
+        description: "Foreign key linking the contact method to the respective Party."
+        semantic_mapping: "Party.Key.Surrogate"
+      - name: SOURCE_SYSTEM
+        type: VARCHAR(50)
+        description: "Originating system of record."
+        semantic_mapping: "Infrastructure.Audit.SourceSystem"
+      - name: COMMUNICATION_USE_CD
+        type: VARCHAR(20)
+        description: "Context of the communication method (e.g., Personal, Business)."
+        semantic_mapping: "Communication.PhoneInfo.CommunicationUseCd"
+      - name: COMMUNICATION_TYPE_CD
+        type: VARCHAR(20)
+        description: "Standardized classification (e.g., Mobile, Email, Landline)."
+        semantic_mapping: "Communication.PhoneInfo.PhoneTypeCd"
+      - name: COMMUNICATION_VALUE_TXT
+        type: VARCHAR(255)
+        description: "The actual phone number, email address, or URI string."
+        semantic_mapping: "Communication.PhoneInfo.PhoneNumber"
+      - name: PRIMARY_IND
+        type: BOOLEAN
+        description: "Boolean flag indicating if this is the preferred method of contact for the Party."
+        semantic_mapping: "Communication.PrimaryIndicator"
+      - name: RECORD_HASH
+        type: VARCHAR(64)
+        description: "Hash of communication attributes for CDC."
+        semantic_mapping: "Infrastructure.Audit.RecordHash"
+
+  - name: SILVER.DIM_INSURANCE_PRODUCT
+    type: dimension
+    primary_key: PRODUCT_SK
+    description: "Coverage appetite and standardized insurance products available for binding."
+    acord_concept: CoverageAvailable
+    columns:
+      - name: PRODUCT_SK
+        type: VARCHAR(64)
+        description: "Deterministic surrogate key for the insurance product."
+        semantic_mapping: "Infrastructure.Key.Surrogate"
+      - name: SOURCE_SYSTEM
+        type: VARCHAR(50)
+        description: "Originating system of record."
+        semantic_mapping: "Infrastructure.Audit.SourceSystem"
+      - name: SOURCE_RECORD_ID
+        type: VARCHAR(50)
+        description: "The original product ID or type code from the source."
+        semantic_mapping: "Infrastructure.Key.Natural"
+      - name: LOB_CD
+        type: VARCHAR(50)
+        description: "Line of Business classification (e.g., Auto, Home, Commercial)."
+        semantic_mapping: "CoverageAvailable.LOB.LOBCd"
+      - name: PRODUCT_CD
+        type: VARCHAR(50)
+        description: "Internal alphanumeric product code or SKU."
+        semantic_mapping: "CoverageAvailable.Product.ProductCd"
+      - name: PRODUCT_NAME
+        type: VARCHAR(100)
+        description: "Market-facing name of the insurance product."
+        semantic_mapping: "CoverageAvailable.Product.ProductName"
+      - name: COVERAGE_LEVEL_CD
+        type: VARCHAR(50)
+        description: "Tier of coverage offered (e.g., Comprehensive, Basic)."
+        semantic_mapping: "CoverageAvailable.Coverage.CoverageCd"
+      - name: BASE_PREMIUM_AMT
+        type: NUMBER(18,2)
+        description: "Standard baseline price before individual risk adjustments."
+        semantic_mapping: "CoverageAvailable.Premium.BaseAmt"
+      - name: TERMS_DESC
+        type: VARCHAR(255)
+        description: "Textual description of the standard terms and conditions."
+        semantic_mapping: "CoverageAvailable.Terms.DescriptionTxt"
+      - name: RECORD_HASH
+        type: VARCHAR(64)
+        description: "Hash of product attributes for CDC."
+        semantic_mapping: "Infrastructure.Audit.RecordHash"
+
+  - name: SILVER.FACT_AGREEMENT
+    type: fact
+    primary_key: AGREEMENT_SK
+    description: "Defines the details, status, and lifecycle of a binding legal insurance contract."
+    acord_concept: Agreement
+    foreign_keys:
+      - column: INSURED_PARTY_SK
+        references: SILVER.DIM_PARTY.PARTY_SK
+      - column: PRODUCER_PARTY_SK
+        references: SILVER.DIM_PARTY.PARTY_SK
+      - column: PRODUCT_SK
+        references: SILVER.DIM_INSURANCE_PRODUCT.PRODUCT_SK
+    columns:
+      - name: AGREEMENT_SK
+        type: VARCHAR(64)
+        description: "Deterministic surrogate key for the policy agreement."
+        semantic_mapping: "Infrastructure.Key.Surrogate"
+      - name: INSURED_PARTY_SK
+        type: VARCHAR(64)
+        description: "Foreign key pointing to the primary customer/insured party."
+        semantic_mapping: "Agreement.PartyRole.InsuredKey"
+      - name: PRODUCER_PARTY_SK
+        type: VARCHAR(64)
+        description: "Foreign key pointing to the agent/employee responsible for the sale."
+        semantic_mapping: "Agreement.PartyRole.ProducerKey"
+      - name: PRODUCT_SK
+        type: VARCHAR(64)
+        description: "Foreign key pointing to the insurance product governing the agreement."
+        semantic_mapping: "Agreement.Product.ProductKey"
+      - name: SOURCE_SYSTEM
+        type: VARCHAR(50)
+        description: "Originating system of record."
+        semantic_mapping: "Infrastructure.Audit.SourceSystem"
+      - name: AGREEMENT_NUM
+        type: VARCHAR(100)
+        description: "Official policy number issued to the customer."
+        semantic_mapping: "Agreement.Policy.PolicyNumber"
+      - name: AGREEMENT_STATUS_CD
+        type: VARCHAR(20)
+        description: "Current lifecycle state of the policy (e.g., Active, Expired)."
+        semantic_mapping: "Agreement.Policy.PolicyStatusCd"
+      - name: EFFECTIVE_DT
+        type: DATE
+        description: "The date and time the insurance coverage officially begins."
+        semantic_mapping: "Agreement.ContractTerm.EffectiveDt"
+      - name: EXPIRATION_DT
+        type: DATE
+        description: "The date and time the insurance coverage ends."
+        semantic_mapping: "Agreement.ContractTerm.ExpirationDt"
+      - name: CURRENT_TERM_AMT
+        type: NUMBER(18,2)
+        description: "ACORD CurrentTermAmt representing the total gross premium for the active term."
+        semantic_mapping: "Agreement.Premium.CurrentTermAmt"
+      - name: RECORD_HASH
+        type: VARCHAR(64)
+        description: "Hash of agreement attributes for CDC."
+        semantic_mapping: "Infrastructure.Audit.RecordHash"
+
+  - name: SILVER.FACT_FINANCIAL_TX
+    type: fact
+    primary_key: TRANSACTION_SK
+    description: "Standardized ledger of all financial events, tracking premium remittances and payment execution states."
+    acord_concept: FinancialTransaction
+    foreign_keys:
+      - column: AGREEMENT_SK
+        references: SILVER.FACT_AGREEMENT.AGREEMENT_SK
+      - column: PAYING_PARTY_SK
+        references: SILVER.DIM_PARTY.PARTY_SK
+    columns:
+      - name: TRANSACTION_SK
+        type: VARCHAR(64)
+        description: "Deterministic surrogate key for the financial transaction."
+        semantic_mapping: "Infrastructure.Key.Surrogate"
+      - name: AGREEMENT_SK
+        type: VARCHAR(64)
+        description: "Foreign key linking the transaction to a specific policy agreement."
+        semantic_mapping: "FinancialTransaction.Agreement.AgreementKey"
+      - name: PAYING_PARTY_SK
+        type: VARCHAR(64)
+        description: "Foreign key linking the transaction to the remitting party/customer."
+        semantic_mapping: "FinancialTransaction.PartyRole.PayerKey"
+      - name: SOURCE_SYSTEM
+        type: VARCHAR(50)
+        description: "Originating system of record."
+        semantic_mapping: "Infrastructure.Audit.SourceSystem"
+      - name: SOURCE_RECORD_ID
+        type: VARCHAR(50)
+        description: "The original receipt or payment ID from the source."
+        semantic_mapping: "Infrastructure.Key.Natural"
+      - name: TRANSACTION_DT
+        type: DATE
+        description: "The operational date the transaction was processed."
+        semantic_mapping: "FinancialTransaction.Payment.TransactionDt"
+      - name: TRANSACTION_AMT
+        type: NUMBER(18,2)
+        description: "The monetary value of the processed transaction."
+        semantic_mapping: "FinancialTransaction.Payment.TransactionAmt"
+      - name: PAYMENT_METHOD_CD
+        type: VARCHAR(50)
+        description: "The vehicle of transaction (e.g., Cash, Credit, EFT)."
+        semantic_mapping: "FinancialTransaction.Payment.MethodCd"
+      - name: TRANSACTION_STATUS_CD
+        type: VARCHAR(20)
+        description: "Current state of the funds (e.g., Settled, Pending)."
+        semantic_mapping: "FinancialTransaction.Payment.StatusCd"
+      - name: RECORD_HASH
+        type: VARCHAR(64)
+        description: "Hash of transaction attributes for CDC."
+        semantic_mapping: "Infrastructure.Audit.RecordHash"
+
+  - name: SILVER.FACT_LOSS_EVENT
+    type: fact
+    primary_key: LOSS_EVENT_SK
+    description: "Contains information regarding the background, status, and financial resolution of a filed claim."
+    acord_concept: LossEvent
+    foreign_keys:
+      - column: AGREEMENT_SK
+        references: SILVER.FACT_AGREEMENT.AGREEMENT_SK
+      - column: CLAIMANT_PARTY_SK
+        references: SILVER.DIM_PARTY.PARTY_SK
+    columns:
+      - name: LOSS_EVENT_SK
+        type: VARCHAR(64)
+        description: "Deterministic surrogate key for the loss event/claim."
+        semantic_mapping: "Infrastructure.Key.Surrogate"
+      - name: AGREEMENT_SK
+        type: VARCHAR(64)
+        description: "Foreign key linking the claim to the active policy agreement."
+        semantic_mapping: "LossEvent.Agreement.AgreementKey"
+      - name: CLAIMANT_PARTY_SK
+        type: VARCHAR(64)
+        description: "Foreign key pointing to the party reporting the loss."
+        semantic_mapping: "LossEvent.PartyRole.ClaimantKey"
+      - name: SOURCE_SYSTEM
+        type: VARCHAR(50)
+        description: "Originating system of record."
+        semantic_mapping: "Infrastructure.Audit.SourceSystem"
+      - name: SOURCE_CLAIM_ID
+        type: VARCHAR(50)
+        description: "The original incident or claim ID assigned by the source."
+        semantic_mapping: "Infrastructure.Key.Natural"
+      - name: LOSS_DT
+        type: DATE
+        description: "The exact date the hazard/incident occurred."
+        semantic_mapping: "LossEvent.Claim.LossDt"
+      - name: REPORTED_DT
+        type: DATE
+        description: "The date the claim was officially filed with the insurer."
+        semantic_mapping: "LossEvent.Claim.ReportedDt"
+      - name: LOSS_TYPE_CD
+        type: VARCHAR(50)
+        description: "ACORD Hazard/Damage classification (e.g., Collision, Theft, Fire)."
+        semantic_mapping: "LossEvent.Claim.LossTypeCd"
+      - name: CLAIM_STATUS_CD
+        type: VARCHAR(20)
+        description: "Current state of adjudication (e.g., Approved, Pending, Rejected)."
+        semantic_mapping: "LossEvent.Claim.ClaimStatusCd"
+      - name: INCURRED_AMT
+        type: NUMBER(18,2)
+        description: "Initial estimated or requested payout amount by the claimant."
+        semantic_mapping: "LossEvent.Financial.IncurredAmt"
+      - name: PAID_TOTAL_AMT
+        type: NUMBER(18,2)
+        description: "Final settled monetary amount disbursed by the insurer."
+        semantic_mapping: "LossEvent.Financial.TotalPaidAmt"
+      - name: SETTLEMENT_DT
+        type: DATE
+        description: "The date the claim was financially resolved and closed."
+        semantic_mapping: "LossEvent.Financial.SettlementDt"
+      - name: RECORD_HASH
+        type: VARCHAR(64)
+        description: "Hash of loss event attributes for CDC."
+        semantic_mapping: "Infrastructure.Audit.RecordHash"
