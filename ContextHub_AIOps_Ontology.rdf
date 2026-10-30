@@ -1,0 +1,666 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+    xmlns:owl="http://www.w3.org/2002/07/owl#"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+    xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    xmlns:prov="http://www.w3.org/ns/prov#"
+    xmlns:sosa="http://www.w3.org/ns/sosa/"
+    xmlns:ops="https://aiops.example.com/ontology#"
+    xmlns:opst="https://aiops.example.com/ontology/taxonomy#">
+
+  <!-- ================================================================
+       ONTOLOGY HEADER
+       ================================================================ -->
+  <owl:Ontology rdf:about="https://aiops.example.com/ontology#">
+    <rdfs:label xml:lang="en">Observability AIOps Ontology</rdfs:label>
+    <dcterms:title xml:lang="en">Observability AIOps Ontology</dcterms:title>
+    <dcterms:description xml:lang="en">Enterprise ontology for observability, incident correlation, causal analysis, and agentic AIOps. Aligns to PROV-O and SOSA. Constrains LLM outputs to a controlled vocabulary.</dcterms:description>
+    <owl:versionIRI rdf:resource="https://aiops.example.com/ontology/1.0.0"/>
+    <owl:versionInfo>1.0.0</owl:versionInfo>
+    <dcterms:created rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2026-10-29</dcterms:created>
+    <dcterms:modified rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2026-10-29</dcterms:modified>
+    <dcterms:license rdf:resource="https://www.apache.org/licenses/LICENSE-2.0"/>
+    <dcterms:creator>Platform Engineering — Observability</dcterms:creator>
+    <rdfs:seeAlso rdf:resource="https://www.w3.org/TR/prov-o/"/>
+    <rdfs:seeAlso rdf:resource="https://www.w3.org/TR/vocab-ssn/"/>
+  </owl:Ontology>
+
+  <!-- ================================================================
+       ANNOTATION PROPERTIES
+       ================================================================ -->
+  <owl:AnnotationProperty rdf:about="https://aiops.example.com/ontology#extractionMethod">
+    <rdfs:label xml:lang="en">extraction method</rdfs:label>
+    <rdfs:comment xml:lang="en">How a triple entered the graph. Constrained to ops:ExtractionScheme. Never 'llm' on a causal edge without human review.</rdfs:comment>
+  </owl:AnnotationProperty>
+  <owl:AnnotationProperty rdf:about="https://aiops.example.com/ontology#sourceCitation">
+    <rdfs:label xml:lang="en">source citation</rdfs:label>
+    <rdfs:comment xml:lang="en">File and line reference for auditability.</rdfs:comment>
+  </owl:AnnotationProperty>
+  <owl:AnnotationProperty rdf:about="https://aiops.example.com/ontology#confidence">
+    <rdfs:label xml:lang="en">confidence</rdfs:label>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
+    <rdfs:comment xml:lang="en">Normalised [0,1]. Prefer ops:correlationCertainty on the edge for link-level uncertainty.</rdfs:comment>
+  </owl:AnnotationProperty>
+  <owl:AnnotationProperty rdf:about="https://aiops.example.com/ontology#canonicalUri">
+    <rdfs:label xml:lang="en">canonical URI</rdfs:label>
+    <rdfs:comment xml:lang="en">The single graph URI an entity MUST resolve to. Enforced by catalog validation.</rdfs:comment>
+  </owl:AnnotationProperty>
+  <owl:AnnotationProperty rdf:about="https://aiops.example.com/ontology#catalogEntry">
+    <rdfs:label xml:lang="en">catalog entry</rdfs:label>
+    <rdfs:comment xml:lang="en">Pointer to the authoritative service-catalog record this entity was validated against.</rdfs:comment>
+  </owl:AnnotationProperty>
+  <owl:AnnotationProperty rdf:about="https://aiops.example.com/ontology#validationStatus">
+    <rdfs:label xml:lang="en">validation status</rdfs:label>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#ValidationStatusEnum"/>
+    <rdfs:comment xml:lang="en">pending | validated | rejected | stale</rdfs:comment>
+  </owl:AnnotationProperty>
+
+  <!-- ================================================================
+       CORE CLASSES
+       ================================================================ -->
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Entity">
+    <rdfs:label xml:lang="en">Entity</rdfs:label>
+    <rdfs:comment xml:lang="en">Root of all first-class operational objects.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Service">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+    <owl:disjointWith rdf:resource="https://aiops.example.com/ontology#Team"/>
+    <owl:disjointWith rdf:resource="https://aiops.example.com/ontology#Region"/>
+    <owl:disjointWith rdf:resource="https://aiops.example.com/ontology#Environment"/>
+    <rdfs:label xml:lang="en">Service</rdfs:label>
+    <rdfs:comment xml:lang="en">A deployable unit with an owner, a region, and an SLO. One service = one canonical URI.</rdfs:comment>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="https://aiops.example.com/ontology#owned_by"/>
+        <owl:qualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:qualifiedCardinality>
+        <owl:onClass rdf:resource="https://aiops.example.com/ontology#Team"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="https://aiops.example.com/ontology#deployed_in"/>
+        <owl:minQualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:minQualifiedCardinality>
+        <owl:onClass rdf:resource="https://aiops.example.com/ontology#Region"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="https://aiops.example.com/ontology#runs_in"/>
+        <owl:qualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:qualifiedCardinality>
+        <owl:onClass rdf:resource="https://aiops.example.com/ontology#Environment"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Application">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:label xml:lang="en">Application</rdfs:label>
+    <rdfs:comment xml:lang="en">A logical grouping of services. Used for org-level ownership and dashboards.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Team">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/ns/prov#Agent"/>
+    <rdfs:label xml:lang="en">Team</rdfs:label>
+    <rdfs:comment xml:lang="en">Owning or on-call group. Bound to the org chart / IAM.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Region">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:label xml:lang="en">Region</rdfs:label>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Environment">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:label xml:lang="en">Environment</rdfs:label>
+    <rdfs:comment xml:lang="en">prod | staging | canary | dev. Typed so agents cannot cross environments accidentally.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Incident">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/ns/prov#Activity"/>
+    <rdfs:label xml:lang="en">Incident</rdfs:label>
+    <rdfs:comment xml:lang="en">A production anomaly under investigation. Never opened without at least one triggering signal.</rdfs:comment>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="https://aiops.example.com/ontology#triggered_by"/>
+        <owl:minQualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:minQualifiedCardinality>
+        <owl:onClass rdf:resource="https://aiops.example.com/ontology#Signal"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#ChangeEvent">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/ns/prov#Activity"/>
+    <rdfs:label xml:lang="en">ChangeEvent</rdfs:label>
+    <rdfs:comment xml:lang="en">Any intentional state change: deploy, config, flag, schema, infra, backfill.</rdfs:comment>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="https://aiops.example.com/ontology#affects"/>
+        <owl:minQualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:minQualifiedCardinality>
+        <owl:onClass rdf:resource="https://aiops.example.com/ontology#Service"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Deployment">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#ConfigChange">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#FeatureFlagChange">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#SchemaChange">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#InfraChange">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#DataBackfill">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Signal">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/ns/sosa/Observation"/>
+    <rdfs:label xml:lang="en">Signal</rdfs:label>
+    <rdfs:comment xml:lang="en">An observed anomaly: metric lift, log pattern, trace tail, alert. Aligned to SOSA.</rdfs:comment>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="https://aiops.example.com/ontology#observed_on"/>
+        <owl:qualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:qualifiedCardinality>
+        <owl:onClass rdf:resource="https://aiops.example.com/ontology#Service"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#MetricAnomaly">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Signal"/>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#LogPatternAnomaly">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Signal"/>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#TraceAnomaly">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Signal"/>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Alert">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Signal"/>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#SyntheticCheckFailure">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Signal"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Remediation">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/ns/prov#Activity"/>
+    <rdfs:label xml:lang="en">Remediation</rdfs:label>
+    <rdfs:comment xml:lang="en">A proposed or executed fix. State machine: proposed → approved → executed | rejected.</rdfs:comment>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="https://aiops.example.com/ontology#approved_by"/>
+        <owl:minQualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:minQualifiedCardinality>
+        <owl:onClass rdf:resource="http://www.w3.org/ns/prov#Agent"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Playbook">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:label xml:lang="en">Playbook</rdfs:label>
+    <rdfs:comment xml:lang="en">Executable procedure. Anchors agent procedural memory to a canonical URI.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#Procedure">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:label xml:lang="en">Procedure</rdfs:label>
+    <rdfs:comment xml:lang="en">An ordered step inside a Playbook.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#DataAsset">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+    <rdfs:label xml:lang="en">DataAsset</rdfs:label>
+    <rdfs:comment xml:lang="en">Table, dataset, stream, or model. Carries lineage and contract bindings.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#DataContract">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:label xml:lang="en">DataContract</rdfs:label>
+    <rdfs:comment xml:lang="en">Declared schema, freshness, and volume expectations for a DataAsset.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#SLI">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:label xml:lang="en">SLI</rdfs:label>
+    <rdfs:comment xml:lang="en">Service-level indicator (metric + threshold + window).</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="https://aiops.example.com/ontology#SLO">
+    <rdfs:subClassOf rdf:resource="https://aiops.example.com/ontology#Entity"/>
+    <rdfs:label xml:lang="en">SLO</rdfs:label>
+    <rdfs:comment xml:lang="en">Service-level objective. Binds one or more SLIs to a target.</rdfs:comment>
+  </owl:Class>
+
+  <!-- ================================================================
+       OBJECT PROPERTIES — TOPOLOGY & OWNERSHIP
+       ================================================================ -->
+  <owl:FunctionalProperty rdf:about="https://aiops.example.com/ontology#owned_by">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+    <owl:inverseOf rdf:resource="https://aiops.example.com/ontology#owns"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Team"/>
+    <rdfs:label xml:lang="en">owned by</rdfs:label>
+    <rdfs:comment xml:lang="en">Exactly one owning team per service.</rdfs:comment>
+  </owl:FunctionalProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#owns">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Team"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:label xml:lang="en">owns</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#on_call_for">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Team"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:label xml:lang="en">on call for</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#member_of">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Application"/>
+    <rdfs:label xml:lang="en">member of</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#deployed_in">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Region"/>
+    <rdfs:label xml:lang="en">deployed in</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#runs_in">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Environment"/>
+    <rdfs:label xml:lang="en">runs in</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:TransitiveProperty rdf:about="https://aiops.example.com/ontology#depends_on">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:label xml:lang="en">depends on</rdfs:label>
+    <rdfs:comment xml:lang="en">Transitive service-to-service dependency. Cycles MUST be rejected at ingest.</rdfs:comment>
+  </owl:TransitiveProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#calls">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:label xml:lang="en">calls</rdfs:label>
+    <rdfs:comment xml:lang="en">Runtime call edge (from tracing). Distinct from declared dependency.</rdfs:comment>
+  </owl:ObjectProperty>
+
+  <!-- ================================================================
+       OBJECT PROPERTIES — INCIDENT / CHANGE / SIGNAL
+       ================================================================ -->
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#affects">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:label xml:lang="en">affects</rdfs:label>
+    <rdfs:comment xml:lang="en">A change MUST affect at least one service.</rdfs:comment>
+  </owl:ObjectProperty>
+
+  <owl:TransitiveProperty rdf:about="https://aiops.example.com/ontology#supersedes">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+    <rdfs:label xml:lang="en">supersedes</rdfs:label>
+  </owl:TransitiveProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#observed_on">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Signal"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:label xml:lang="en">observed on</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#triggered_by">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Incident"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Signal"/>
+    <rdfs:label xml:lang="en">triggered by</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#impacts">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Incident"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:label xml:lang="en">impacts</rdfs:label>
+    <rdfs:comment xml:lang="en">Contrast with ops:affects (change→service). This is incident→service.</rdfs:comment>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#resolved_by">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Incident"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Remediation"/>
+    <rdfs:label xml:lang="en">resolved by</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#targets">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Remediation"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+    <rdfs:label xml:lang="en">targets</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#approved_by">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Remediation"/>
+    <rdfs:range rdf:resource="http://www.w3.org/ns/prov#Agent"/>
+    <rdfs:label xml:lang="en">approved by</rdfs:label>
+    <rdfs:comment xml:lang="en">Human sign-off. Agent MUST NOT self-approve.</rdfs:comment>
+  </owl:ObjectProperty>
+
+  <!-- ================================================================
+       OBJECT PROPERTIES — CAUSAL (AutoSRE core)
+       ================================================================ -->
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#correlates_with">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Signal"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+    <rdfs:label xml:lang="en">correlates with</rdfs:label>
+    <rdfs:comment xml:lang="en">Correlation is NOT causation. Carries ops:correlationCertainty and ops:causalProofTier. Remediation MUST NOT auto-execute on a pure correlated edge.</rdfs:comment>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#causally_implicates">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Signal"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+    <rdfs:label xml:lang="en">causally implicates</rdfs:label>
+    <rdfs:comment xml:lang="en">Valid only when causalProofTier ≥ tierCohortRateIsolated AND counterfactualChecked = true.</rdfs:comment>
+  </owl:ObjectProperty>
+
+  <owl:TransitiveProperty rdf:about="https://aiops.example.com/ontology#precedes">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+    <rdfs:label xml:lang="en">precedes</rdfs:label>
+    <rdfs:comment xml:lang="en">Temporal ordering. Used by the correlation engine's 10-min window.</rdfs:comment>
+  </owl:TransitiveProperty>
+
+  <!-- ================================================================
+       OBJECT PROPERTIES — PLAYBOOKS & DATA
+       ================================================================ -->
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#applies_to">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Playbook"/>
+    <rdfs:range>
+      <owl:Class>
+        <owl:unionOf rdf:parseType="Collection">
+          <rdf:Description rdf:about="https://aiops.example.com/ontology#Service"/>
+          <rdf:Description rdf:about="https://aiops.example.com/ontology#DataAsset"/>
+        </owl:unionOf>
+      </owl:Class>
+    </rdfs:range>
+    <rdfs:label xml:lang="en">applies to</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#has_step">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Playbook"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Procedure"/>
+    <rdfs:label xml:lang="en">has step</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#next_step">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Procedure"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#Procedure"/>
+    <rdfs:label xml:lang="en">next step</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:TransitiveProperty rdf:about="https://aiops.example.com/ontology#derived_from">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#DataAsset"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#DataAsset"/>
+    <rdfs:label xml:lang="en">derived from</rdfs:label>
+    <rdfs:comment xml:lang="en">Data lineage edge. Transitive. Provenance tag required on every edge.</rdfs:comment>
+  </owl:TransitiveProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#validated_by">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#DataAsset"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#DataContract"/>
+    <rdfs:label xml:lang="en">validated by</rdfs:label>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="https://aiops.example.com/ontology#binds_to">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#SLO"/>
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#SLI"/>
+    <rdfs:label xml:lang="en">binds to</rdfs:label>
+  </owl:ObjectProperty>
+
+  <!-- ================================================================
+       DATATYPE PROPERTIES
+       ================================================================ -->
+  <owl:FunctionalProperty rdf:about="https://aiops.example.com/ontology#serviceId">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Service"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:about="https://aiops.example.com/ontology#teamId">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Team"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:about="https://aiops.example.com/ontology#incidentId">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Incident"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:about="https://aiops.example.com/ontology#changeId">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#ChangeEvent"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:about="https://aiops.example.com/ontology#signalId">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Signal"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:about="https://aiops.example.com/ontology#remediationId">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Remediation"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+
+  <owl:DatatypeProperty rdf:about="https://aiops.example.com/ontology#timestamp">
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#dateTime"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:about="https://aiops.example.com/ontology#startedAt">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Incident"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#dateTime"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:about="https://aiops.example.com/ontology#resolvedAt">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#Incident"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#dateTime"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:about="https://aiops.example.com/ontology#severity">
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#SeverityEnum"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:about="https://aiops.example.com/ontology#status">
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#StatusEnum"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:about="https://aiops.example.com/ontology#correlationCertainty">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#correlates_with"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
+    <rdfs:comment xml:lang="en">0.0–1.0. Threshold for actionable hypothesis: 0.6.</rdfs:comment>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:about="https://aiops.example.com/ontology#causalProofTier">
+    <rdfs:range rdf:resource="https://aiops.example.com/ontology#CausalProofScheme"/>
+    <rdfs:comment xml:lang="en">SKOS-typed proof tier. Controls what the agent is allowed to conclude.</rdfs:comment>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:about="https://aiops.example.com/ontology#counterfactualChecked">
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#boolean"/>
+    <rdfs:comment xml:lang="en">True only when the causal claim survives a counterfactual test.</rdfs:comment>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:about="https://aiops.example.com/ontology#targetThreshold">
+    <rdfs:domain rdf:resource="https://aiops.example.com/ontology#SLO"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
+  </owl:DatatypeProperty>
+
+  <!-- ================================================================
+       SKOS CONCEPT SCHEMES
+       ================================================================ -->
+  <skos:ConceptScheme rdf:about="https://aiops.example.com/ontology#SeverityScheme">
+    <skos:prefLabel xml:lang="en">Incident Severity</skos:prefLabel>
+  </skos:ConceptScheme>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#sev1">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#SeverityScheme"/>
+    <skos:prefLabel xml:lang="en">SEV1 — Critical</skos:prefLabel>
+    <skos:notation>1</skos:notation>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#sev2">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#SeverityScheme"/>
+    <skos:prefLabel xml:lang="en">SEV2 — Major</skos:prefLabel>
+    <skos:notation>2</skos:notation>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#sev3">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#SeverityScheme"/>
+    <skos:prefLabel xml:lang="en">SEV3 — Minor</skos:prefLabel>
+    <skos:notation>3</skos:notation>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#sev4">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#SeverityScheme"/>
+    <skos:prefLabel xml:lang="en">SEV4 — Low</skos:prefLabel>
+    <skos:notation>4</skos:notation>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#sev5">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#SeverityScheme"/>
+    <skos:prefLabel xml:lang="en">SEV5 — Info</skos:prefLabel>
+    <skos:notation>5</skos:notation>
+  </skos:Concept>
+
+  <skos:ConceptScheme rdf:about="https://aiops.example.com/ontology#StatusScheme">
+    <skos:prefLabel xml:lang="en">Incident Status</skos:prefLabel>
+  </skos:ConceptScheme>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#detected">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#StatusScheme"/>
+    <skos:prefLabel xml:lang="en">Detected</skos:prefLabel>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#triaged">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#StatusScheme"/>
+    <skos:prefLabel xml:lang="en">Triaged</skos:prefLabel>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#mitigating">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#StatusScheme"/>
+    <skos:prefLabel xml:lang="en">Mitigating</skos:prefLabel>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#monitoring">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#StatusScheme"/>
+    <skos:prefLabel xml:lang="en">Monitoring</skos:prefLabel>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#resolved">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#StatusScheme"/>
+    <skos:prefLabel xml:lang="en">Resolved</skos:prefLabel>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#postmortem">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#StatusScheme"/>
+    <skos:prefLabel xml:lang="en">Postmortem</skos:prefLabel>
+  </skos:Concept>
+
+  <skos:ConceptScheme rdf:about="https://aiops.example.com/ontology#CausalProofScheme">
+    <skos:prefLabel xml:lang="en">Causal Proof Tier</skos:prefLabel>
+    <skos:definition xml:lang="en">Ordered strength of evidence supporting a causal claim between a Signal and a ChangeEvent.</skos:definition>
+  </skos:ConceptScheme>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#tierCorrelated">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#CausalProofScheme"/>
+    <skos:prefLabel xml:lang="en">Correlated</skos:prefLabel>
+    <skos:definition xml:lang="en">Co-occurrence in time. Weakest tier. Agent may report but MUST NOT recommend auto-remediation.</skos:definition>
+    <skos:broader rdf:resource="https://aiops.example.com/ontology/taxonomy#tierTemporalPrecedence"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#tierTemporalPrecedence">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#CausalProofScheme"/>
+    <skos:prefLabel xml:lang="en">Temporal Precedence</skos:prefLabel>
+    <skos:definition xml:lang="en">Change precedes the signal within a bounded window.</skos:definition>
+    <skos:broader rdf:resource="https://aiops.example.com/ontology/taxonomy#tierCohortRateIsolated"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#tierCohortRateIsolated">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#CausalProofScheme"/>
+    <skos:prefLabel xml:lang="en">Cohort Rate Isolation</skos:prefLabel>
+    <skos:definition xml:lang="en">Anomaly isolated to a cohort that the change touched; comparable cohort unaffected.</skos:definition>
+    <skos:broader rdf:resource="https://aiops.example.com/ontology/taxonomy#tierCounterfactualValidated"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#tierCounterfactualValidated">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#CausalProofScheme"/>
+    <skos:prefLabel xml:lang="en">Counterfactual Validated</skos:prefLabel>
+    <skos:definition xml:lang="en">Strongest tier. Claim survives counterfactual test. Only tier that permits autonomous remediation with human approval.</skos:definition>
+  </skos:Concept>
+
+  <skos:ConceptScheme rdf:about="https://aiops.example.com/ontology#ExtractionScheme">
+    <skos:prefLabel xml:lang="en">Extraction Method</skos:prefLabel>
+  </skos:ConceptScheme>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#extracted">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#ExtractionScheme"/>
+    <skos:prefLabel xml:lang="en">Extracted</skos:prefLabel>
+    <skos:definition xml:lang="en">Deterministic parser / API. Highest trust.</skos:definition>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#inferred">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#ExtractionScheme"/>
+    <skos:prefLabel xml:lang="en">Inferred</skos:prefLabel>
+    <skos:definition xml:lang="en">Heuristic. May be dropped with --no-inferred.</skos:definition>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#llm">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#ExtractionScheme"/>
+    <skos:prefLabel xml:lang="en">LLM-derived</skos:prefLabel>
+    <skos:definition xml:lang="en">Model-proposed. MUST wait for human review before activation.</skos:definition>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#pending">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#ExtractionScheme"/>
+    <skos:prefLabel xml:lang="en">Pending</skos:prefLabel>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#validated">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#ExtractionScheme"/>
+    <skos:prefLabel xml:lang="en">Validated</skos:prefLabel>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#rejected">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#ExtractionScheme"/>
+    <skos:prefLabel xml:lang="en">Rejected</skos:prefLabel>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://aiops.example.com/ontology/taxonomy#stale">
+    <skos:inScheme rdf:resource="https://aiops.example.com/ontology#ExtractionScheme"/>
+    <skos:prefLabel xml:lang="en">Stale</skos:prefLabel>
+  </skos:Concept>
+
+  <!-- ================================================================
+       ENUMS (owl:oneOf)
+       ================================================================ -->
+  <owl:Class rdf:about="https://aiops.example.com/ontology#SeverityEnum">
+    <owl:oneOf rdf:parseType="Collection">
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#sev1"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#sev2"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#sev3"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#sev4"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#sev5"/>
+    </owl:oneOf>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#StatusEnum">
+    <owl:oneOf rdf:parseType="Collection">
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#detected"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#triaged"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#mitigating"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#monitoring"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#resolved"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#postmortem"/>
+    </owl:oneOf>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#CausalProofEnum">
+    <owl:oneOf rdf:parseType="Collection">
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#tierCorrelated"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#tierTemporalPrecedence"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#tierCohortRateIsolated"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#tierCounterfactualValidated"/>
+    </owl:oneOf>
+  </owl:Class>
+  <owl:Class rdf:about="https://aiops.example.com/ontology#ValidationStatusEnum">
+    <owl:oneOf rdf:parseType="Collection">
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#pending"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#validated"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#rejected"/>
+      <rdf:Description rdf:about="https://aiops.example.com/ontology/taxonomy#stale"/>
+    </owl:oneOf>
+  </owl:Class>
+
+</rdf:RDF>
