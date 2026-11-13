@@ -1,0 +1,17 @@
+What is the biggest barrier to AI agents in data engineering?
+The biggest barrier is missing context; bare schemas, unclear ownership, inconsistent definitions, and no lineage. Agents fail not because they can’t write SQL, but because they don’t know which data is trusted, who owns it, or how it connects to downstream assets. Fixing the model doesn’t fix this problem. Building the context layer does.
+
+How do AI agents automate pipeline monitoring?
+AI agents detect failures, correlate them with upstream schema drifts, trace impact via column-level lineage, and route issues to the right owners automatically; instead of engineers manually reviewing logs and tracing dependencies by hand. The critical enabler is column-level lineage in the agent’s context, not just error log access.
+
+What role does a data catalog play in AI agent workflows?
+A governed data catalog like Atlan provides the context substrate AI agents need: certified assets, column-level lineage, quality scores, ownership metadata, and semantic definitions; all accessible at runtime via MCP or API. Without this, agents operate on bare schemas and produce unreliable outputs.
+
+Can AI agents replace data engineers?
+No; but they substantially reduce toil on repetitive tasks: pipeline debugging, documentation, drift detection, and quality enforcement. Data engineers focus on system design, business logic, and governance decisions. Agents handle the operational layer. The net effect is more engineering productivity, not headcount reduction.
+
+What is the Atlan MCP Server and how does it help AI agents?
+The Atlan MCP Server exposes governed metadata; asset search, column-level lineage, glossary terms, certifications, and quality scores; to any MCP-compatible agent or tool (Claude, Cursor, dbt agents, pipeline orchestrators). It acts as the shared context fabric underneath tool-specific MCP servers, so agents get a unified, trusted answer about any data asset without bespoke integrations.
+
+How does schema drift affect AI agent accuracy?
+Schema drift is one of the leading causes of silent agent failure. When column names change, types shift, or upstream tables are renamed, agents working on bare schemas produce incorrect outputs without flagging errors. Agents backed by active metadata get notified of drift and can re-validate their context before acting; preventing silent failures from propagating downstream.
