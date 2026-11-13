@@ -1,0 +1,8 @@
+AI agents in data engineering automate pipeline monitoring and root-cause analysis, lineage tracing and explainability, schema discovery and drift detection, and data quality enforcement. These use cases reduce manual toil significantly — but only where a governed context layer provides agents with validated metadata, certified assets, and column-level lineage. Without that substrate, agents hallucinate, misroute issues, and fail silently.
+
+Core AI agent use cases for data engineering teams
+Pipeline monitoring and RCA — detect failures, trace root causes via column-level lineage, and route alerts to the right owner automatically
+Lineage tracing and explainability — walk end-to-end provenance from BI metric to source system in seconds, with certification status at every node
+Schema drift detection — monitor schema registries for changes, evaluate downstream impact, and propagate metadata updates proactively
+Data quality enforcement — consume quality scores and anomaly signals before acting; flag low-quality assets before errors propagate
+Metadata enrichment and documentation — auto-generate descriptions, tag PII columns, propose owners, and route to stewards for one-click approval
