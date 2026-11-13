@@ -1,0 +1,142 @@
+Data Source Discovery & Metadata Capture
+Before writing a single line of code, data engineers must understand where the data comes from and what it looks like.
+
+Tasks:
+
+Identify source systems (e.g., databases, APIs, flat files, event streams)
+Analyze schema, data types, keys, volumes, frequency
+Capture metadata and data lineage
+Tools:
+
+Apache Atlas, AWS Glue Data Catalog etc..
+
+Example:
+
+A bank is undergoing a digital transformation and wants to centralize its data ecosystem across departments (e.g., retail banking, credit, and fraud detection). However, there are hundreds of data sources scattered across different systems — Oracle DBs, SQL Servers, AWS S3 buckets, third-party APIs, and legacy mainframes.
+
+Data sourcing tools helps to scan connected environments.
+Data classification review tools can help to understand PII, Confidentiality.
+Metadata such as table names, columns, datatypes, row counts, and lineage are captured in this phase.
+2. Data Ingestion
+
+Ingestion is the process of collecting raw data from source systems and landing it in a central storage layer (data lake or staging database).
+
+Ingestion Types:
+
+Batch: Periodic loads (daily, hourly)
+Streaming: Real-time ingestion (Kafka, Pub/Sub)
+Tools:
+
+Batch: Sqoop, Airbyte, AWS DMS, dbt
+Stream: Kafka, Apache NiFi, AWS Kinesis
+Example: Use Sqoop to batch-extract customer records from MySQL into HDFS and Kafka to stream website click events.
+
+3. Data Staging & Storage
+
+Once ingested, data lands in a raw zone. Here, it’s stored in its original format — untouched and untransformed.
+
+Best Practices:
+
+Store as Parquet/ORC for better compression and performance
+Apply naming conventions and partitioning strategies
+Add audit fields to differentiate the load details
+Tools:
+
+Cloud Storage (S3, ADLS, GCS), HDFS
+Example: customer transaction data in HDFS in Parquet format, partitioned by transaction date with sequence ID generated for each load.
+
+4. Data Quality & Validation
+
+Next, validate the data to ensure it’s trustworthy before applying transformations.
+
+Checks:
+
+Schema validation
+Null/missing values
+Duplicates
+Business logic violations (e.g., negative revenue)
+Tools:
+
+Great Expectations, Deequ, custom PySpark validations
+Example: Validate that transaction type is among the give codes in reference data, and revenue is never negative.
+
+5. Data Transformation & Enrichment
+
+This is where data engineers clean, enrich, and restructure data to make it analytics-ready.
+
+Tasks:
+
+Join datasets
+Standardize columns
+Derive new fields
+Aggregate facts
+Tools:
+
+PySpark, dbt, Dataflow, SQL
+Example: Join support tickets with transaction history to flag high-risk customers (e.g., multiple complaints, recent cancellations).
+
+6. Data Modeling
+
+Transforming raw data into structured models that support business intelligence and analytics.
+
+Common Models:
+
+Star Schema: Fact and dimension tables
+Normalized models: Operational stores
+Lakehouse: Bronze → Silver → Gold layers
+Tools:
+
+dbt, BigQuery, Snowflake, Databricks
+Example: Build a fact table customer_lifetime_value with dimensions like customer_profile, geography, and plan_type.
+
+7. Data Reconciliation
+
+Ensure your transformations haven’t introduced errors by matching transformed data with source data.
+
+Checks:
+
+Row counts
+Checksums
+Sample comparisons
+Example: Compare number of unique customers in your final model with the original source tables to catch any filtering issues.
+
+8. Data Loading & Publishing
+
+Load the clean, modeled data into its final destination for consumption.
+
+Destinations:
+
+Data warehouses (Snowflake, BigQuery, Redshift)
+Lakehouse layers
+BI tools
+Example: Load aggregated KPIs into BigQuery and connect to Looker dashboards.
+
+9. Data Governance & Security
+
+Implement access controls, encryption, and data lineage tracking to ensure responsible data usage.
+
+Tasks:
+
+Apply RBAC (Role-Based Access Control)
+Mask PII or sensitive data
+Maintain data lineage
+Tools:
+
+Collibra, Azure Purview, Apache Atlas, Unity Catalog
+Example: Mask customer email addresses for analysts and enforce access control via GCP IAM.
+
+10. Orchestration & Monitoring
+
+Schedule, manage, and monitor data workflows to ensure reliability and automation.
+
+Tasks:
+
+Job dependency management
+Retry logic and alerting
+SLA monitoring
+Tools:
+
+Apache Airflow, Oozie, WLM, Autosys, Azure Data Factory
+Example: Use Airflow to orchestrate a daily ETL pipeline and send alerts on failures via Slack.
+
+
